@@ -16,7 +16,8 @@
     <GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
     <MandroidI18n />
     <JavaMaximumHeapSize>1G</JavaMaximumHeapSize>
-    <NuGetPackageImportStamp>7d62c8f2</NuGetPackageImportStamp>
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
     <DevInstrumentationEnabled>True</DevInstrumentationEnabled>
     <AndroidUseLatestPlatformSdk>true</AndroidUseLatestPlatformSdk>
@@ -52,7 +53,8 @@ Store. It is possible to run and debug this project on physical and virtual Andr
     <WarningLevel>4</WarningLevel>
     <AndroidUseSharedRuntime>false</AndroidUseSharedRuntime>
     <AndroidSupportedAbis>armeabi;armeabi-v7a;x86</AndroidSupportedAbis>
-    <DebugType></DebugType>
+    <DebugType>
+    </DebugType>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <CustomCommands>
       <CustomCommands>
@@ -109,6 +111,15 @@ Store. It is possible to run and debug this project on physical and virtual Andr
     </Reference>
     <Reference Include="ExifLib">
       <HintPath>..\packages\ExifLib.PCL.1.0.2-pre01\lib\netstandard1.0\ExifLib.dll</HintPath>
+    </Reference>
+    <Reference Include="Xamarin.Firebase.Common, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Xamarin.Firebase.Common.60.1142.0\lib\MonoAndroid80\Xamarin.Firebase.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="Xamarin.Firebase.Iid, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Xamarin.Firebase.Iid.60.1142.0\lib\MonoAndroid80\Xamarin.Firebase.Iid.dll</HintPath>
+    </Reference>
+    <Reference Include="Xamarin.Firebase.Messaging, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Xamarin.Firebase.Messaging.60.1142.0\lib\MonoAndroid80\Xamarin.Firebase.Messaging.dll</HintPath>
     </Reference>
     <Reference Include="XLabs.Core">
       <HintPath>..\packages\XLabs.Core.2.3.0-pre05\lib\netstandard1.0\XLabs.Core.dll</HintPath>
@@ -372,6 +383,7 @@ Store. It is possible to run and debug this project on physical and virtual Andr
     <Compile Include="Probes\Location\AndroidEstimoteBeaconProbe.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="app.config" />
     <None Include="packages.config" />
     <None Include="Resources\AboutResources.txt" />
     <None Include="Sensus.licenseheader" />
@@ -426,7 +438,7 @@ Store. It is possible to run and debug this project on physical and virtual Andr
     <AndroidAsset Include="Assets\README.txt" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Callbacks\" />
+    <GoogleServicesJson Include="google-services.json" />
   </ItemGroup>
   <Import Project="..\Sensus.Shared\Sensus.Shared.projitems" Label="Shared" />
   <Import Project="..\Sensus.Android.Shared\Sensus.Android.Shared.projitems" Label="Shared" />
@@ -460,4 +472,15 @@ Store. It is possible to run and debug this project on physical and virtual Andr
   <Import Project="..\packages\Xamarin.GooglePlayServices.Places.60.1142.0\build\MonoAndroid80\Xamarin.GooglePlayServices.Places.targets" Condition="Exists('..\packages\Xamarin.GooglePlayServices.Places.60.1142.0\build\MonoAndroid80\Xamarin.GooglePlayServices.Places.targets')" />
   <Import Project="..\packages\Xamarin.GooglePlayServices.Awareness.60.1142.0\build\MonoAndroid80\Xamarin.GooglePlayServices.Awareness.targets" Condition="Exists('..\packages\Xamarin.GooglePlayServices.Awareness.60.1142.0\build\MonoAndroid80\Xamarin.GooglePlayServices.Awareness.targets')" />
   <Import Project="..\packages\Xamarin.Forms.2.5.0.122203\build\netstandard1.0\Xamarin.Forms.targets" Condition="Exists('..\packages\Xamarin.Forms.2.5.0.122203\build\netstandard1.0\Xamarin.Forms.targets')" />
+  <Import Project="..\packages\Xamarin.Firebase.Common.60.1142.0\build\MonoAndroid80\Xamarin.Firebase.Common.targets" Condition="Exists('..\packages\Xamarin.Firebase.Common.60.1142.0\build\MonoAndroid80\Xamarin.Firebase.Common.targets')" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\Xamarin.Firebase.Common.60.1142.0\build\MonoAndroid80\Xamarin.Firebase.Common.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Xamarin.Firebase.Common.60.1142.0\build\MonoAndroid80\Xamarin.Firebase.Common.targets'))" />
+    <Error Condition="!Exists('..\packages\Xamarin.Firebase.Iid.60.1142.0\build\MonoAndroid80\Xamarin.Firebase.Iid.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Xamarin.Firebase.Iid.60.1142.0\build\MonoAndroid80\Xamarin.Firebase.Iid.targets'))" />
+    <Error Condition="!Exists('..\packages\Xamarin.Firebase.Messaging.60.1142.0\build\MonoAndroid80\Xamarin.Firebase.Messaging.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Xamarin.Firebase.Messaging.60.1142.0\build\MonoAndroid80\Xamarin.Firebase.Messaging.targets'))" />
+  </Target>
+  <Import Project="..\packages\Xamarin.Firebase.Iid.60.1142.0\build\MonoAndroid80\Xamarin.Firebase.Iid.targets" Condition="Exists('..\packages\Xamarin.Firebase.Iid.60.1142.0\build\MonoAndroid80\Xamarin.Firebase.Iid.targets')" />
+  <Import Project="..\packages\Xamarin.Firebase.Messaging.60.1142.0\build\MonoAndroid80\Xamarin.Firebase.Messaging.targets" Condition="Exists('..\packages\Xamarin.Firebase.Messaging.60.1142.0\build\MonoAndroid80\Xamarin.Firebase.Messaging.targets')" />
 </Project>
