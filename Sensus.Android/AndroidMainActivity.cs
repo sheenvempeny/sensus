@@ -28,6 +28,7 @@ using Xamarin.Facebook;
 using Xamarin.Forms.Platform.Android;
 using Plugin.CurrentActivity;
 using System.Threading.Tasks;
+using Android.Gms.Common;
 
 #if __ANDROID_23__
 using Plugin.Permissions;
@@ -58,7 +59,26 @@ namespace Sensus.Android
         {
             get { return _facebookCallbackManager; }
         }
-
+        public bool IsPlayServicesAvailable()
+        {
+            int resultCode = GoogleApiAvailability.Instance.IsGooglePlayServicesAvailable(this);
+            if (resultCode != ConnectionResult.Success)
+            {
+                if (GoogleApiAvailability.Instance.IsUserResolvableError(resultCode))
+                    Console.WriteLine($"Error: {GoogleApiAvailability.Instance.GetErrorString(resultCode)}");
+                else
+                {
+                    Console.WriteLine("Error: Google Play services not supported");
+                    Finish();
+                }
+                return false;
+            }
+            else
+            {
+                Console.WriteLine("Google Play Services is available.");
+                return true;
+            }
+        }
         protected override void OnCreate(Bundle savedInstanceState)
         {
             Console.Error.WriteLine("--------------------------- Creating activity ---------------------------");
@@ -125,6 +145,9 @@ namespace Sensus.Android
             };
 
             OpenIntentAsync(Intent);
+
+            // detect connection with Google Play services, finishes if not able to connect.
+            IsPlayServicesAvailable();
         }
 
         protected override void OnStart()

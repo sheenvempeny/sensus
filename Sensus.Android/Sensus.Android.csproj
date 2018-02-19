@@ -343,6 +343,8 @@ Store. It is possible to run and debug this project on physical and virtual Andr
     <Compile Include="AndroidSensusServiceHelper.cs" />
     <Compile Include="AndroidTextToSpeech.cs" />
     <Compile Include="AndroidMainActivity.cs" />
+    <Compile Include="FirebaseIIDService.cs" />
+    <Compile Include="FirebaseMessagingService.cs" />
     <Compile Include="Probes\AndroidSensorListener.cs" />
     <Compile Include="Probes\Apps\AndroidFacebookProbe.cs" />
     <Compile Include="Probes\Communication\AndroidSmsIncomingBroadcastReceiver.cs" />
