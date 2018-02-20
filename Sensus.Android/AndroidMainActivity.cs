@@ -29,6 +29,7 @@ using Xamarin.Forms.Platform.Android;
 using Plugin.CurrentActivity;
 using System.Threading.Tasks;
 using Android.Gms.Common;
+using Firebase.Analytics;
 
 #if __ANDROID_23__
 using Plugin.Permissions;
@@ -52,6 +53,7 @@ namespace Sensus.Android
         private ICallbackManager _facebookCallbackManager;
         private App _app;
         private ManualResetEvent _serviceBindWait;
+        FirebaseAnalytics firebaseAnalytics;
 
         private readonly object _locker = new object();
 
@@ -148,6 +150,9 @@ namespace Sensus.Android
 
             // detect connection with Google Play services, finishes if not able to connect.
             IsPlayServicesAvailable();
+
+            // init firebase analytics
+            firebaseAnalytics = FirebaseAnalytics.GetInstance(this);
         }
 
         protected override void OnStart()
