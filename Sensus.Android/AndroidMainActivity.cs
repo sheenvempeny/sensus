@@ -30,6 +30,7 @@ using Plugin.CurrentActivity;
 using System.Threading.Tasks;
 using Android.Gms.Common;
 using Firebase.Analytics;
+using Firebase.Iid;
 
 #if __ANDROID_23__
 using Plugin.Permissions;
@@ -150,6 +151,16 @@ namespace Sensus.Android
 
             // detect connection with Google Play services, finishes if not able to connect.
             IsPlayServicesAvailable();
+
+#if DEBUG
+            // on debugging, a redeploy of the app will delete the old token and effectively force a token refresh
+            Task.Run(() =>
+            {
+                // must be executed on new thread
+                FirebaseInstanceId.Instance.DeleteInstanceId();
+                Console.WriteLine("Refreshing prior token: " + FirebaseInstanceId.Instance.Token);
+            });
+#endif
 
             // init firebase analytics
             firebaseAnalytics = FirebaseAnalytics.GetInstance(this);
