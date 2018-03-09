@@ -39,6 +39,7 @@ using Sensus.Probes.User.Scripts;
 using Sensus.Callbacks;
 using Sensus.Encryption;
 using System.Text.RegularExpressions;
+using Microsoft.AppCenter.Analytics;
 
 #if __IOS__
 using HealthKit;
@@ -122,7 +123,7 @@ namespace Sensus
         {
             try
             {
-                string json = SensusServiceHelper.Get().ConvertJsonForCrossPlatform(SensusContext.Current.SymmetricEncryption.Decrypt(bytes));
+                string json = SensusServiceHelper.Get().ConvertJsonForCrossPlatform(SensusContext.Current.SymmetricEncryption.DecryptToString(bytes));
 
                 DeserializeAsync(json, async protocol =>
                 {
@@ -189,8 +190,8 @@ namespace Sensus
                                 }
 
                                 // store any data that have accumulated locally
-                                SensusServiceHelper.Get().FlashNotificationAsync("Committing data from previous study...");
-                                await registeredProtocol.LocalDataStore.CommitAndReleaseAddedDataAsync(CancellationToken.None);
+                                SensusServiceHelper.Get().FlashNotificationAsync("Submitting data from previous study...");
+                                await registeredProtocol.LocalDataStore.WriteToRemoteAsync(CancellationToken.None);
 
                                 // stop the study and unregister it 
                                 SensusServiceHelper.Get().FlashNotificationAsync("Stopping previous study...");
@@ -414,7 +415,7 @@ namespace Sensus
                 using (MemoryStream protocolStream = new MemoryStream())
                 {
                     uiTestingProtocolFile.CopyTo(protocolStream);
-                    string protocolJSON = SensusServiceHelper.Get().ConvertJsonForCrossPlatform(SensusContext.Current.SymmetricEncryption.Decrypt(protocolStream.ToArray()));
+                    string protocolJSON = SensusServiceHelper.Get().ConvertJsonForCrossPlatform(SensusContext.Current.SymmetricEncryption.DecryptToString(protocolStream.ToArray()));
                     DeserializeAsync(protocolJSON, protocol =>
                     {
                         if (protocol == null)
@@ -481,8 +482,6 @@ namespace Sensus
         private LocalDataStore _localDataStore;
         private RemoteDataStore _remoteDataStore;
         private string _storageDirectory;
-        private ProtocolReportDatum _mostRecentReport;
-        private bool _forceProtocolReportsToRemoteDataStore;
         private string _lockPasswordHash;
         private AnonymizedJsonContractResolver _jsonAnonymizer;
         private DateTimeOffset _randomTimeAnchor;
@@ -622,13 +621,6 @@ namespace Sensus
                     }
                 }
             }
-        }
-
-        [JsonIgnore]
-        public ProtocolReportDatum MostRecentReport
-        {
-            get { return _mostRecentReport; }
-            set { _mostRecentReport = value; }
         }
 
         public string LockPasswordHash
@@ -801,18 +793,6 @@ namespace Sensus
             {
                 _endTimestamp = new DateTime(_endTimestamp.Year, _endTimestamp.Month, _endTimestamp.Day, value.Hours, value.Minutes, value.Seconds);
             }
-        }
-
-        /// <summary>
-        /// Whether or not to submit <see cref="Protocol"/> status reports to the <see cref="RemoteDataStore"/> regardless of the setting
-        /// for <see cref="DataStores.Local.LocalDataStore.UploadToRemoteDataStore"/>.
-        /// </summary>
-        /// <value><c>true</c> if force protocol reports to remote data store; otherwise, <c>false</c>.</value>
-        [OnOffUiProperty("Force Reports to Remote:", true, 22)]
-        public bool ForceProtocolReportsToRemoteDataStore
-        {
-            get { return _forceProtocolReportsToRemoteDataStore; }
-            set { _forceProtocolReportsToRemoteDataStore = value; }
         }
 
         /// <summary>
@@ -1205,7 +1185,7 @@ namespace Sensus
         ///     ```
         /// 
         ///   * Use the `PUBLIC KEY` (public.pem) as <see cref="AsymmetricEncryptionPublicKey"/>.
-        ///   * Enable <see cref="AmazonS3RemoteDataStore.Encrypt"/>.
+        ///   * Enable <see cref="FileLocalDataStore.Encrypt"/>.
         /// 
         /// Keep all `PRIVATE KEY` information safe and secure. Never share it.
         /// </summary>
@@ -1240,7 +1220,6 @@ namespace Sensus
         private Protocol()
         {
             _running = false;
-            _forceProtocolReportsToRemoteDataStore = false;
             _lockPasswordHash = "";
             _jsonAnonymizer = new AnonymizedJsonContractResolver(this);
             _shareable = false;
@@ -1292,7 +1271,9 @@ namespace Sensus
         {
             // reset id and storage directory (directory might exist if deserializing the same protocol multiple times)
             if (resetId)
+            {
                 _id = Guid.NewGuid().ToString();
+            }
 
             ResetStorageDirectory();
 
@@ -1314,12 +1295,14 @@ namespace Sensus
             }
 
             if (_localDataStore != null)
+            {
                 _localDataStore.Reset();
+            }
 
             if (_remoteDataStore != null)
+            {
                 _remoteDataStore.Reset();
-
-            _mostRecentReport = null;
+            }
         }
 
         private void ResetStorageDirectory()
@@ -1693,101 +1676,63 @@ namespace Sensus
         {
             return Task.Run(async () =>
             {
-                #region build report
-
-                ProtocolReportDatum report;
+                ParticipationReportDatum participationReport;
 
                 lock (_locker)
                 {
-                    string error = null;
-                    string warning = null;
-                    string misc = null;
+                    Analytics.TrackEvent(TrackedEvent.Health + ":" + GetType(), new Dictionary<string, string>
+                    {
+                        { "Running", _running.ToString() }
+                    });
 
                     if (!_running)
                     {
-                        error += "Restarting protocol \"" + _name + "\"...";
                         try
                         {
                             Stop();
                             Start();
                         }
-                        catch (Exception ex)
+                        catch (Exception)
                         {
-                            error += ex.Message + "...";
                         }
-
-                        if (_running)
-                            error += "restarted protocol." + Environment.NewLine;
-                        else
-                            error += "failed to restart protocol." + Environment.NewLine;
                     }
 
                     if (_running)
                     {
-                        if (_localDataStore == null)
+                        if (_localDataStore.TestHealth())
                         {
-                            error += "No local data store present on protocol." + Environment.NewLine;
-                        }
-                        else if (_localDataStore.TestHealth(ref error, ref warning, ref misc))
-                        {
-                            error += "Restarting local data store...";
-
                             try
                             {
                                 _localDataStore.Restart();
                             }
-                            catch (Exception ex)
+                            catch (Exception)
                             {
-                                error += ex.Message + "...";
-                            }
-
-                            if (!_localDataStore.Running)
-                            {
-                                error += "failed to restart local data store." + Environment.NewLine;
                             }
                         }
 
-                        if (_remoteDataStore == null)
+                        if (_remoteDataStore.TestHealth())
                         {
-                            error += "No remote data store present on protocol." + Environment.NewLine;
-                        }
-                        else if (_remoteDataStore.TestHealth(ref error, ref warning, ref misc))
-                        {
-                            error += "Restarting remote data store...";
-
                             try
                             {
                                 _remoteDataStore.Restart();
                             }
-                            catch (Exception ex)
+                            catch (Exception)
                             {
-                                error += ex.Message + "...";
                             }
-
-                            if (!_remoteDataStore.Running)
-                                error += "failed to restart remote data store." + Environment.NewLine;
                         }
 
                         foreach (Probe probe in _probes)
                         {
                             if (probe.Enabled)
                             {
-                                if (probe.TestHealth(ref error, ref warning, ref misc))
+                                if (probe.TestHealth())
                                 {
-                                    error += "Restarting probe \"" + probe.GetType().FullName + "\"...";
-
                                     try
                                     {
                                         probe.Restart();
                                     }
-                                    catch (Exception ex)
+                                    catch (Exception)
                                     {
-                                        error += ex.Message + "...";
-                                    }
-
-                                    if (!probe.Running)
-                                    {
-                                        error += "failed to restart probe \"" + probe.GetType().FullName + "\"." + Environment.NewLine;
                                     }
                                 }
                                 else
@@ -1808,43 +1753,26 @@ namespace Sensus
                     }
 
 #if __ANDROID__
-                    misc += "Wake lock count:  " + (SensusServiceHelper.Get() as Sensus.Android.IAndroidSensusServiceHelper)?.WakeLockAcquisitionCount + Environment.NewLine;
+                    Analytics.TrackEvent(TrackedEvent.Miscellaneous + ":" + GetType(), new Dictionary<string, string>
+                    {
+                        { "Wake Lock Count", (SensusServiceHelper.Get() as Android.IAndroidSensusServiceHelper).WakeLockAcquisitionCount.ToString() }
+                    });
 #endif
 
-                    report = new ProtocolReportDatum(DateTimeOffset.UtcNow, error, warning, misc, this);
-                    SensusServiceHelper.Get().Logger.Log("Protocol report:" + Environment.NewLine + report, LoggingLevel.Normal, GetType());
+                    participationReport = new ParticipationReportDatum(DateTimeOffset.UtcNow, this);
+                    SensusServiceHelper.Get().Logger.Log("Protocol report:" + Environment.NewLine + participationReport, LoggingLevel.Normal, GetType());
                 }
 
-                #endregion
-
-                SensusServiceHelper.Get().Logger.Log("Storing protocol report locally.", LoggingLevel.Normal, GetType());
-                await _localDataStore.AddAsync(report, cancellationToken, false);
-
-                if (!_localDataStore.UploadToRemoteDataStore && _forceProtocolReportsToRemoteDataStore)
-                {
-                    SensusServiceHelper.Get().Logger.Log("Local data aren't pushed to remote, so we're copying the report datum directly to the remote cache.", LoggingLevel.Normal, GetType());
-                    await _remoteDataStore.AddAsync(report, cancellationToken, false);
-                }
-
-                lock (_locker)
-                {
-                    _mostRecentReport = report;
-                }
+                await _localDataStore.WriteDatumAsync(participationReport, cancellationToken);
             });
         }
 
-        public void StopAsync(Action callback = null)
+        public Task StopAsync()
         {
-            new Thread(() =>
-                {
-                    Stop();
-
-                    if (callback != null)
-                    {
-                        callback();
-                    }
-
-                }).Start();
+            return Task.Run(() =>
+            {
+                Stop();
+            });
         }
 
         public void Stop()

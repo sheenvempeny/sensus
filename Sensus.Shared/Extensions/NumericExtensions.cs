@@ -1,4 +1,4 @@
-// Copyright 2014 The Rector & Visitors of the University of Virginia
+﻿// Copyright 2014 The Rector & Visitors of the University of Virginia
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,18 +13,24 @@
 // limitations under the License.
 
 using System;
-using System.Collections.Generic;
-using System.Threading;
-using Sensus.Probes.Device;
-using UIKit;
 
-namespace Sensus.iOS.Probes.Device
+namespace Sensus.Extensions
 {
-    public class iOSBatteryProbe : BatteryProbe
+    public static class NumericExtensions
     {
-        protected override IEnumerable<Datum> Poll(CancellationToken cancellationToken)
+        public static int RoundedPercentageOf(this int numerator, int denominator, int round)
         {
-            return new Datum[] { new BatteryDatum(DateTimeOffset.UtcNow, (int)(UIDevice.CurrentDevice.BatteryLevel * 100)) };  // report value [0,100] to be same as android
+            return (100.0 * (numerator / (double)denominator)).Round(round);
+        }
+
+        public static int Round(this int value, int round)
+        {
+            return round * (int)Math.Round(value / (double)round);
+        }
+
+        public static int Round(this double value, int round)
+        {
+            return round * (int)Math.Round(value / round);
         }
     }
 }

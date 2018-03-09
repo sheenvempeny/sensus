@@ -25,7 +25,7 @@ namespace Sensus.Tests.Classes
         {
             get
             {
-                throw new NotImplementedException();
+                return "asdfasdfasdfasdf";
             }
         }
 
@@ -33,7 +33,15 @@ namespace Sensus.Tests.Classes
         {
             get
             {
-                throw new NotImplementedException();
+                return new Random().NextDouble() > 0.5;
+            }
+        }
+
+        public override float BatteryChargePercent
+        {
+            get
+            {
+                return (float)new Random().NextDouble();
             }
         }
 
@@ -41,7 +49,7 @@ namespace Sensus.Tests.Classes
         {
             get
             {
-                throw new NotImplementedException();
+                return "Android";
             }
         }
 
@@ -49,7 +57,7 @@ namespace Sensus.Tests.Classes
         {
             get
             {
-                throw new NotImplementedException();
+                return "vXXXX";
             }
         }
 
@@ -57,7 +65,7 @@ namespace Sensus.Tests.Classes
         {
             get
             {
-                throw new NotImplementedException();
+                return new Random().NextDouble() > 0.5;
             }
         }
 

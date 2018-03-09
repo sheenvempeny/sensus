@@ -164,7 +164,7 @@ namespace Sensus.UI
                     actions.Add("Display Participation");
                 }
 
-                if (selectedProtocol.RemoteDataStore?.CanRetrieveCommittedData ?? false)
+                if (selectedProtocol.RemoteDataStore?.CanRetrieveWrittenData ?? false)
                 {
                     actions.Add("Scan Participation Barcode");
                 }
@@ -182,11 +182,6 @@ namespace Sensus.UI
                     {
                         actions.Add("Ungroup");
                     }
-                }
-
-                if (selectedProtocol.Running)
-                {
-                    actions.Add("Status");
                 }
 
                 if (!selectedProtocol.Running && selectedProtocol.ScheduledStartCallback != null)
@@ -227,11 +222,10 @@ namespace Sensus.UI
                 {
                     if (await DisplayAlert("Confirm Stop", "Are you sure you want to stop " + selectedProtocol.Name + "?", "Yes", "No"))
                     {
-                        selectedProtocol.StopAsync(() =>
-                        {
-                            // rebind to pick up color and running status changes
-                            Refresh();
-                        });
+                        await selectedProtocol.StopAsync();
+
+                        // rebind to pick up color and running status changes
+                        Refresh();
                     }
                 }
                 else if (selectedAction == "Email Study Manager for Help")
@@ -265,21 +259,19 @@ namespace Sensus.UI
                         false,
                         async () =>
                         {
-                            // add participation reward datum to remote data store and commit immediately
                             ParticipationRewardDatum participationRewardDatum = new ParticipationRewardDatum(DateTimeOffset.UtcNow, selectedProtocol.Participation);
 
-                            bool commitFailed;
-
+                            bool writeFailed = false;
                             try
                             {
-                                commitFailed = !await selectedProtocol.RemoteDataStore.CommitAsync(participationRewardDatum, cancellationTokenSource.Token);
+                                await selectedProtocol.RemoteDataStore.WriteDatumAsync(participationRewardDatum, cancellationTokenSource.Token);
                             }
                             catch (Exception)
                             {
-                                commitFailed = true;
+                                writeFailed = true;
                             }
 
-                            if (commitFailed)
+                            if (writeFailed)
                             {
                                 SensusServiceHelper.Get().FlashNotificationAsync("Failed to submit participation information to remote server. You will not be able to verify your participation at this time.");
                             }
@@ -292,15 +284,15 @@ namespace Sensus.UI
 
                             Device.BeginInvokeOnMainThread(async () =>
                             {
-                                // only show the QR code for the reward datum if the datum was committed to the remote data store and if the data store can retrieve it.
-                                await Navigation.PushAsync(new ParticipationReportPage(selectedProtocol, participationRewardDatum, !commitFailed && (selectedProtocol.RemoteDataStore?.CanRetrieveCommittedData ?? false)));
+                                // only show the QR code for the reward datum if the datum was written to the remote data store and if the data store can retrieve it.
+                                await Navigation.PushAsync(new ParticipationReportPage(selectedProtocol, participationRewardDatum, !writeFailed && (selectedProtocol.RemoteDataStore?.CanRetrieveWrittenData ?? false)));
                             });
                         },
                         inputs =>
                         {
                             // if the prompt was closed by the user instead of the cancellation token, cancel the token in order
-                            // to cancel the remote data store commit. if the prompt was closed by the termination of the remote
-                            // data store commit (i.e., by the canceled token), then don't cancel the token again.
+                            // to cancel the remote data store write. if the prompt was closed by the termination of the remote
+                            // data store write (i.e., by the canceled token), then don't cancel the token again.
                             if (!cancellationTokenSource.IsCancellationRequested)
                             {
                                 cancellationTokenSource.Cancel();
@@ -338,7 +330,7 @@ namespace Sensus.UI
                                     // after the page shows up, attempt to retrieve the participation reward datum.
                                     try
                                     {
-                                        ParticipationRewardDatum participationRewardDatum = await selectedProtocol.RemoteDataStore.GetDatum<ParticipationRewardDatum>(barcodeResult.Text, cancellationTokenSource.Token);
+                                        ParticipationRewardDatum participationRewardDatum = await selectedProtocol.RemoteDataStore.GetDatumAsync<ParticipationRewardDatum>(barcodeResult.Text, cancellationTokenSource.Token);
 
                                         // cancel the token to close the input above, but only if the token hasn't already been canceled by the user.
                                         if (!cancellationTokenSource.IsCancellationRequested)
@@ -470,27 +462,6 @@ namespace Sensus.UI
                     {
                         selectedProtocol.GroupedProtocols.Clear();
                     }
-                }
-                else if (selectedAction == "Status")
-                {
-                    if (SensusServiceHelper.Get().ProtocolShouldBeRunning(selectedProtocol))
-                    {
-                        await selectedProtocol.TestHealthAsync(true);
-
-                        Device.BeginInvokeOnMainThread(async () =>
-                        {
-                            if (selectedProtocol.MostRecentReport == null)
-                            {
-                                await DisplayAlert("No Report", "Status check failed.", "OK");
-                            }
-                            else
-                            {
-                                await Navigation.PushAsync(new ViewTextLinesPage("Protocol Status", selectedProtocol.MostRecentReport.ToString().Split(new string[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).ToList(), null, null));
-                            }
-                        });
-                    }
-                    else
-                        await DisplayAlert("Protocol Not Running", "Cannot check status of protocol when protocol is not running.", "OK");
                 }
                 else if (selectedAction == "Delete")
                 {

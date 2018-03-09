@@ -23,6 +23,7 @@ using Syncfusion.SfChart.XForms;
 using System.Threading.Tasks;
 using Sensus.Context;
 using Sensus.Probes.User.MicrosoftBand;
+using Microsoft.AppCenter.Analytics;
 
 namespace Sensus.Probes
 {
@@ -67,7 +68,6 @@ namespace Sensus.Probes
         private List<DateTime> _successfulHealthTestTimes;
         private List<ChartDataPoint> _chartData;
         private int _maxChartDataCount;
-        private bool _runLocalCommitOnStore;
 
         private readonly object _locker = new object();
 
@@ -227,23 +227,6 @@ namespace Sensus.Probes
             }
         }
 
-        /// <summary>
-        /// Whether the <see cref="Probe"/> should run a local commit each time the <see cref="Probe"/> generates data.
-        /// </summary>
-        /// <value><c>true</c> to run local commit on each store; otherwise, <c>false</c>.</value>
-        [OnOffUiProperty("Run Local Commit On Store:", true, 14)]
-        public bool RunLocalCommitOnStore
-        {
-            get
-            {
-                return _runLocalCommitOnStore;
-            }
-            set
-            {
-                _runLocalCommitOnStore = value;
-            }
-        }
-
         protected Probe()
         {
             _enabled = _running = false;
@@ -378,6 +361,12 @@ namespace Sensus.Probes
             }
         }
 
+        /// <summary>
+        /// Stores a <see cref="Datum"/> within the <see cref="LocalDataStore"/>. Will not throw an <see cref="Exception"/>.
+        /// </summary>
+        /// <returns>The datum async.</returns>
+        /// <param name="datum">Datum.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
         public virtual Task<bool> StoreDatumAsync(Datum datum, CancellationToken? cancellationToken)
         {
             // track the most recent datum and call timestamp regardless of whether the datum is null or whether we're storing data
@@ -414,7 +403,16 @@ namespace Sensus.Probes
                         }
                     }
 
-                    return _protocol.LocalDataStore.AddAsync(datum, cancellationToken, _runLocalCommitOnStore);
+                    // catch any exceptions, as the caller (e.g., a probe listening) could very well be unprotected on the UI thread. throwing
+                    // an exception here can crash the app.
+                    try
+                    {
+                        return _protocol.LocalDataStore.WriteDatumAsync(datum, cancellationToken.GetValueOrDefault());
+                    }
+                    catch (Exception ex)
+                    {
+                        SensusServiceHelper.Get().Logger.Log("Failed to write datum:  " + ex, LoggingLevel.Normal, GetType());
+                    }
                 }
             }
 
@@ -471,15 +469,19 @@ namespace Sensus.Probes
             }
         }
 
-        public virtual bool TestHealth(ref string error, ref string warning, ref string misc)
+        public virtual bool TestHealth()
         {
             bool restart = false;
 
             if (!_running)
             {
                 restart = true;
-                error += "Probe \"" + GetType().FullName + "\" is not running." + Environment.NewLine;
             }
+
+            Analytics.TrackEvent(TrackedEvent.Health + ":" + GetType(), new Dictionary<string, string>
+            {
+                { "Running", _running.ToString() }
+            });
 
             return restart;
         }
